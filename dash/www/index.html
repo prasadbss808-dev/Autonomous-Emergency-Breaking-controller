@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AEB Live Dashboard</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121821; --panel2:#171f2a; --line:#243041; --text:#e6edf3; --muted:#8b98a9;
+  --accent:#4cc2ff; --ok:#22c55e; --warn:#eab308; --partial:#f97316; --strong:#ea580c; --emerg:#ef4444;
+  --stopped:#64748b; --fault:#a855f7; --ttc:#f59e0b; --range:#4cc2ff;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+body{padding:14px 16px 24px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.2px}
+header h1 span{color:var(--muted);font-weight:500}
+.pill{font:600 12px var(--sans);padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.live{color:#04140a;background:var(--ok);border-color:var(--ok)}
+.pill.stale{color:#1a1300;background:var(--warn);border-color:var(--warn)}
+.pill.off{color:#fff;background:#7f1d1d;border-color:#7f1d1d}
+.meta{color:var(--muted);font:12px var(--mono)}
+.spacer{flex:1}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(12,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:600}
+.span2{grid-column:span 2}.span3{grid-column:span 3}.span4{grid-column:span 4}.span5{grid-column:span 5}.span6{grid-column:span 6}
+.span7{grid-column:span 7}.span8{grid-column:span 8}.span12{grid-column:span 12}
+@media (max-width:1100px){.span2{grid-column:span 3}.span3{grid-column:span 6}.span4,.span5,.span7,.span8{grid-column:span 12}.span6{grid-column:span 12}}
+@media (max-width:640px){.span2{grid-column:span 6}.span3{grid-column:span 12}body{padding:10px}}
+/* state */
+#stateCard{position:relative;overflow:hidden}
+#stateCard .bar{position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--stopped)}
+#stateName{font:800 34px/1.1 var(--sans);letter-spacing:.5px;margin:2px 0 6px 6px;word-break:break-word}
+#stateSub{margin-left:6px;color:var(--muted);font:13px var(--mono)}
+.duty{margin:12px 0 0 6px;height:10px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.duty>div{height:100%;width:0;background:var(--ok);transition:width .15s}
+.kpi .v{font:700 30px/1.1 var(--mono)}
+.kpi .u{color:var(--muted);font:13px var(--sans);margin-left:4px}
+.kpi .s{color:var(--muted);font:12px var(--mono);margin-top:6px;min-height:15px}
+canvas{display:block;width:100%}
+#radar{height:430px}
+#timeline{height:220px}
+.camwrap{position:relative;background:#05080b;border:1px solid var(--line);border-radius:8px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.camwrap img{width:100%;height:100%;object-fit:contain;display:none}
+.camwrap .ph{color:var(--muted);font:13px var(--sans);text-align:center;padding:10px}
+.objlist{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:150px;overflow:auto}
+.obj{font:600 14px var(--mono);padding:6px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.obj b{color:#fff}
+.obj .tag{margin-left:auto;font:600 11px var(--sans);padding:2px 8px;border-radius:999px;background:#3b0d0d;color:#fca5a5;border:1px solid #7f1d1d}
+.obj .tag.side{background:#0c2a17;color:#86efac;border-color:#14532d}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:600 12px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted)}
+.chip.ok{color:#bbf7d0;border-color:#14532d;background:#0c2a17}
+.chip.bad{color:#fecaca;border-color:#7f1d1d;background:#3b0d0d}
+.chip.info{color:#c7d2fe;border-color:#312e81;background:#151436}
+.faults{margin-top:10px;font:12px var(--mono);color:var(--muted)}
+.events{font:12px/1.45 var(--mono);height:260px;overflow:auto;background:#0a0e13;border:1px solid var(--line);border-radius:8px;padding:8px}
+.ev{white-space:pre-wrap;word-break:break-word}
+.ev .t{color:#5b6b80}
+.ev.s1{color:#fde68a}.ev.s2{color:#fca5a5}.ev.s3{color:#fff;background:#7f1d1d}
+.ev.objev{color:#7dd3fc;font-weight:600}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:700 15px var(--sans);padding:14px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
+button:hover{filter:brightness(1.15)}
+button:active{transform:translateY(1px)}
+#bGo{background:#0c2a17;border-color:#166534;color:#bbf7d0}
+#bStop{background:#2a2108;border-color:#854d0e;color:#fde68a}
+#bEstop{grid-column:span 2;background:#7f1d1d;border-color:#ef4444;color:#fff;font-size:18px;padding:18px}
+#bClear{background:var(--panel2);grid-column:span 2}
+.note{color:var(--muted);font:12px var(--sans);margin-top:10px;line-height:1.4}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font:12px var(--mono);color:var(--muted)}
+.kv b{color:var(--text);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font:12px var(--sans);color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<header>
+  <h1>QNX Autonomous Emergency Braking <span>· live</span></h1>
+  <span id="conn" class="pill off">OFFLINE</span>
+  <span class="spacer"></span>
+  <span class="meta" id="meta">waiting for data…</span>
+</header>
+
+<div class="grid">
+  <!-- state + KPIs -->
+  <section class="card span4" id="stateCard">
+    <div class="bar" id="stateBar"></div>
+    <h2 style="margin-left:6px">AEB state</h2>
+    <div id="stateName">—</div>
+    <div id="stateSub">risk — · motor —</div>
+    <div class="duty" title="motor duty"><div id="dutyBar"></div></div>
+  </section>
+  <section class="card span2 kpi">
+    <h2>Distance</h2><div><span class="v" id="kRange">—</span><span class="u">m</span></div>
+    <div class="s" id="kRangeS">no in-path target</div>
+  </section>
+  <section class="card span2 kpi">
+    <h2>Closing speed</h2><div><span class="v" id="kVc">—</span><span class="u">m/s</span></div>
+    <div class="s" id="kVcS">&nbsp;</div>
+  </section>
+  <section class="card span2 kpi">
+    <h2>Time to collision</h2><div><span class="v" id="kTtc">∞</span><span class="u">s</span></div>
+    <div class="s" id="kTtcS">&nbsp;</div>
+  </section>
+  <section class="card span2 kpi">
+    <h2>Brake command latency</h2><div><span class="v" id="kLat">—</span><span class="u">µs</span></div>
+    <div class="s" id="kLatS">deadline 50 000 µs</div>
+  </section>
+
+  <!-- radar + camera -->
+  <section class="card span7">
+    <h2>Radar — bird's-eye view (RD-03D)</h2>
+    <canvas id="radar"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--emerg)"></i>threat (in path)</span>
+      <span><i style="background:#fbbf24"></i>in path</span>
+      <span><i style="background:#64748b"></i>beside the path</span>
+      <span><i style="background:rgba(76,194,255,.35)"></i>driving corridor</span>
+      <span><i style="background:var(--emerg);height:2px"></i>stop distance</span>
+    </div>
+  </section>
+  <section class="card span5">
+    <h2>Camera — object detection (IMX708 + OpenCV MobileNet-SSD)</h2>
+    <div class="camwrap"><img id="cam" alt="camera"><div class="ph" id="camPh">camera not running<br><span style="font-size:12px">start ./run_vision.sh on the Pi</span></div></div>
+    <div class="meta" id="camMeta" style="margin-top:8px">&nbsp;</div>
+    <div class="objlist" id="objList"></div>
+  </section>
+
+  <!-- timeline -->
+  <section class="card span12">
+    <h2>Timeline — last 30 s</h2>
+    <canvas id="timeline"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--range)"></i>distance to threat (m)</span>
+      <span><i style="background:var(--ttc)"></i>TTC (s, capped at 5)</span>
+      <span><i style="background:var(--ok)"></i>NORMAL</span><span><i style="background:var(--warn)"></i>WARNING</span>
+      <span><i style="background:var(--partial)"></i>PARTIAL</span><span><i style="background:var(--strong)"></i>STRONG</span>
+      <span><i style="background:var(--emerg)"></i>EMERGENCY</span><span><i style="background:var(--stopped)"></i>STOPPED</span>
+    </div>
+  </section>
+
+  <!-- health, events, controls -->
+  <section class="card span4">
+    <h2>System health</h2>
+    <div class="chips" id="chips"></div>
+    <div class="faults" id="faults">&nbsp;</div>
+    <h2 style="margin-top:16px">Parameters</h2>
+    <div class="kv" id="params"></div>
+  </section>
+  <section class="card span5">
+    <h2>Events (newest first)</h2>
+    <div class="events" id="events"></div>
+  </section>
+  <section class="card span3">
+    <h2>Controls</h2>
+    <div class="ctl">
+      <button id="bGo">GO</button>
+      <button id="bStop">STOP</button>
+      <button id="bEstop">E-STOP</button>
+      <button id="bClear">Clear impact latch</button>
+    </div>
+    <div class="note">GO is accepted only when the radar is healthy and the path is clear.
+      The master switch remains the hardware stop.</div>
+    <div class="meta" id="ctlMsg" style="margin-top:8px">&nbsp;</div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const STATE_COLORS = {
+  NORMAL:"#22c55e", WARNING:"#eab308", PARTIAL_BRAKE:"#f97316", STRONG_BRAKE:"#ea580c",
+  EMERGENCY_BRAKE:"#ef4444", STOPPED:"#64748b", RADAR_FAULT:"#a855f7", IMU_FAULT:"#a855f7",
+  MOTOR_FAULT:"#a855f7", SYSTEM_FAULT:"#a855f7", STARTING:"#334155"
+};
+const FAULT_NAMES = ["radar timeout","radar UART","IMU timeout","IMU I2C","IMU implausible","motor GPIO",
+  "brake: no decel","watchdog thread","deadline miss","impact","operator E-STOP","camera lost (info)","guard missing (info)"];
+const HIST_S = 30;
+let hist = [];               // {t, range|null, ttc|null, state}
+let lastEventSeq = 0;
+let events = [];
+let lastFrame = -1, imgBusy = false, lastImgT = 0;
+let lastOk = 0;
+let latest = null;
+
+/* ---------------- polling ---------------- */
+async function poll(){
+  const t0 = performance.now();
+  try{
+    const ctl = new AbortController();
+    const to = setTimeout(()=>ctl.abort(), 1500);
+    const r = await fetch("/api/state", {cache:"no-store", signal:ctl.signal});
+    clearTimeout(to);
+    const j = await r.json();
+    lastOk = Date.now();
+    latest = j;
+    update(j);
+  }catch(e){ setConn(); }
+  const dt = performance.now() - t0;
+  setTimeout(poll, Math.max(0, 100 - dt));
+}
+
+function setConn(a){
+  const el = $("conn");
+  if (Date.now() - lastOk > 2000){ el.className="pill off"; el.textContent="OFFLINE (no link to Pi)"; return; }
+  if (!a){ el.className="pill stale"; el.textContent="AEB NOT RUNNING"; return; }
+  if (!a.alive){ el.className="pill stale"; el.textContent="AEB STALE"; return; }
+  el.className="pill live"; el.textContent="LIVE";
+}
+
+function fmt(v, d){ return (v===null||v===undefined||!isFinite(v)) ? "—" : Number(v).toFixed(d); }
+
+/* ---------------- update ---------------- */
+function update(j){
+  const a = j.aeb, v = j.vision;
+  setConn(a);
+  if (a){
+    $("meta").textContent = `mode ${a.mode} · cycle ${a.cycle} · up ${fmt(a.uptime_s,1)} s · pid ${a.pid}`;
+    const col = STATE_COLORS[a.state] || "#334155";
+    $("stateBar").style.background = col;
+    $("stateName").textContent = a.state.replace("_"," ");
+    $("stateName").style.color = col;
+    $("stateSub").textContent = `risk ${a.risk} · motor ${a.motor.cmd}${a.motor.cmd==="DRIVE" ? " "+fmt(a.motor.duty,0)+"%" : ""} · ${a.motor.backend}`;
+    const db = $("dutyBar");
+    db.style.width = (a.motor.cmd==="DRIVE" ? a.motor.duty : 0) + "%";
+    db.style.background = a.motor.cmd==="BRAKE" ? "var(--emerg)" : "var(--ok)";
+
+    const th = a.threat;
+    $("kRange").textContent = th.valid ? fmt(th.range_m,2) : "—";
+    $("kRangeS").textContent = th.valid ? `target id${th.id} · x ${fmt(th.x_m,2)} m · stop at ${fmt(a.config.proximity_stop_m,2)} m`
+                                        : `no in-path target (${th.n_detected} seen)`;
+    $("kVc").textContent = th.valid ? fmt(th.v_close,2) : "—";
+    $("kVcS").textContent = th.valid ? (th.v_close > 0.05 ? "approaching" : (th.v_close < -0.05 ? "moving away" : "not closing")) : " ";
+    $("kTtc").textContent = a.ttc_valid ? fmt(a.ttc_s,2) : "∞";
+    $("kTtc").style.color = !a.ttc_valid ? "" : a.ttc_s <= a.config.ttc[3] ? "var(--emerg)" :
+                             a.ttc_s <= a.config.ttc[2] ? "var(--strong)" : a.ttc_s <= a.config.ttc[1] ? "var(--partial)" :
+                             a.ttc_s <= a.config.ttc[0] ? "var(--warn)" : "";
+    $("kTtcS").textContent = `d_safe P/S/F ${fmt(a.d_safe[0],2)}/${fmt(a.d_safe[1],2)}/${fmt(a.d_safe[2],2)} m`;
+    $("kLat").textContent = fmt(a.motor.latency_us,0);
+    $("kLatS").textContent = `worst ${fmt(a.motor.max_latency_us,0)} µs · deadline 50 000 µs`;
+
+    const now = j.server_time_ms/1000;
+    hist.push({t:now, range: th.valid ? th.range_m : null, ttc: a.ttc_valid ? Math.min(a.ttc_s,5) : null, state:a.state});
+    while (hist.length && now - hist[0].t > HIST_S) hist.shift();
+
+    renderHealth(a, v);
+    renderParams(a);
+    renderEvents(a);
+    drawRadar(a);
+  } else {
+    $("meta").textContent = "dashboard server running · AEB not started";
+    renderHealth(null, v);
+  }
+  renderCamera(v);
+  drawTimeline();
+}
+
+function chip(label, state){ return `<span class="chip ${state}">${label}</span>`; }
+function renderHealth(a, v){
+  let h = "";
+  if (a){
+    h += chip("Radar " + (a.health.radar ? "OK" : "FAULT"), a.health.radar ? "ok":"bad");
+    h += chip("IMU " + (a.health.imu ? "OK" : "n/a"), a.health.imu ? "ok":"info");
+    h += chip("Motor " + (a.health.motor ? "OK" : "FAULT"), a.health.motor ? "ok":"bad");
+    h += chip("System " + (a.health.system ? "OK" : "FAULT"), a.health.system ? "ok":"bad");
+    h += chip("Guard " + (a.health.guard ? "connected" : "not running"), a.health.guard ? "ok":"info");
+    if (a.health.degraded) h += chip("DEGRADED", "bad");
+    if (a.motor.latched) h += chip("SAFE-LATCH", "bad");
+    h += chip(`Radar ${fmt(a.radar.period_ms,0)} ms/frame · ${a.radar.frames_bad} bad`, "info");
+  } else h += chip("AEB not running", "bad");
+  const vAlive = v && v.alive;
+  h += chip("Camera " + (vAlive ? `${fmt(v.fps,1)} fps` : "off"), vAlive ? "ok" : "info");
+  $("chips").innerHTML = h;
+  if (a){
+    const names = [];
+    FAULT_NAMES.forEach((n,i)=>{ if (a.health.faults & (1<<i)) names.push(n); });
+    $("faults").textContent = `faults 0x${a.health.faults.toString(16).padStart(4,"0")}` + (names.length ? " · " + names.join(", ") : " · none");
+  } else $("faults").textContent = " ";
+}
+
+function renderParams(a){
+  const c = a.config;
+  $("params").innerHTML =
+    `<span>stop distance</span><b>${fmt(c.proximity_stop_m,2)} m</b>` +
+    `<span>corridor</span><b>±${fmt(c.corridor_half_width_m,2)} m</b>` +
+    `<span>TTC warn/partial/strong/full</span><b>${c.ttc.map(x=>fmt(x,1)).join(" / ")} s</b>` +
+    `<span>cruise duty</span><b>${fmt(c.cruise_duty,0)} %</b>` +
+    `<span>auto start / resume</span><b>${c.auto_start?"on":"off"} / ${c.auto_resume?"on":"off"}</b>` +
+    `<span>radar frames</span><b>${a.radar.frames_ok} ok · ${a.radar.frames_bad} bad</b>`;
+}
+
+function esc(s){ return s.replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function renderEvents(a){
+  let added = false;
+  for (const e of a.events){
+    if (e.seq > lastEventSeq){ events.push(e); lastEventSeq = e.seq; added = true; }
+  }
+  if (a.event_count < lastEventSeq){ events = a.events.slice(); lastEventSeq = a.event_count; added = true; } // AEB restarted
+  if (!added) return;
+  if (events.length > 300) events = events.slice(-300);
+  const box = $("events");
+  box.innerHTML = events.slice().reverse().map(e => {
+    const objCls = e.text.startsWith("OBJECT DETECTED") ? " objev" : "";
+    return `<div class="ev s${e.sev}${objCls}"><span class="t">[${e.t.toFixed(2).padStart(8)}]</span> ${esc(e.text)}</div>`;
+  }).join("");
+}
+
+function renderCamera(v){
+  const img = $("cam"), ph = $("camPh");
+  if (!v || !v.alive){
+    img.style.display = "none"; ph.style.display = "block";
+    ph.innerHTML = "camera not running<br><span style='font-size:12px'>start ./run_vision.sh on the Pi</span>";
+    $("camMeta").textContent = " ";
+    $("objList").innerHTML = "";
+    return;
+  }
+  $("camMeta").textContent = `${v.source} · ${fmt(v.fps,1)} fps · inference ${fmt(v.infer_ms,0)} ms · frame ${v.frame_no}`;
+  const now = performance.now();
+  if (v.jpeg_frame && v.jpeg_frame !== lastFrame && !imgBusy && now - lastImgT > 120){
+    imgBusy = true; lastImgT = now; lastFrame = v.jpeg_frame;
+    const n = new Image();
+    n.onload = () => { img.src = n.src; img.style.display = "block"; ph.style.display = "none"; imgBusy = false; };
+    n.onerror = () => { imgBusy = false; };
+    n.src = "/api/frame.jpg?f=" + v.jpeg_frame;
+  }
+  const dets = (v.dets || []).slice().sort((a,b)=> (b.ahead - a.ahead) || (b.conf - a.conf));
+  $("objList").innerHTML = dets.length ? dets.map(d =>
+      `<div class="obj">OBJECT DETECTED: <b>${esc(d.label.toUpperCase())}</b>
+        <span style="color:var(--muted);font-weight:500">${Math.round(d.conf*100)}% · ${d.bearing>0?"+":""}${fmt(d.bearing,0)}°</span>
+        <span class="tag ${d.ahead ? "" : "side"}">${d.ahead ? "AHEAD" : "SIDE"}</span></div>`).join("")
+    : `<div class="obj" style="color:var(--muted);font-weight:500">no objects detected</div>`;
+}
+
+/* ---------------- canvas helpers ---------------- */
+function fitCanvas(c){
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)){ c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); }
+  const g = c.getContext("2d");
+  g.setTransform(dpr,0,0,dpr,0,0);
+  return [g, w, h];
+}
+
+function drawRadar(a){
+  const [g, w, h] = fitCanvas($("radar"));
+  g.clearRect(0,0,w,h);
+  const YMAX = 6, XMAX = Math.max(2, YMAX * w / h / 2);
+  const ox = w/2, oy = h - 18, sc = (h - 30) / YMAX;
+  const X = x => ox + x*sc, Y = y => oy - y*sc;
+  // grid
+  g.lineWidth = 1; g.strokeStyle = "#1e2835"; g.fillStyle = "#5b6b80"; g.font = "11px ui-monospace,monospace";
+  for (let r=1; r<=YMAX; r++){ g.beginPath(); g.arc(ox, oy, r*sc, Math.PI, 2*Math.PI); g.stroke(); g.fillText(r+" m", ox + 4, Y(r) + 12); }
+  for (let x=-Math.floor(XMAX); x<=Math.floor(XMAX); x++){ g.beginPath(); g.moveTo(X(x), oy); g.lineTo(X(x), Y(YMAX)); g.stroke(); }
+  // corridor
+  const cw = a.config.corridor_half_width_m;
+  g.fillStyle = "rgba(76,194,255,0.12)"; g.fillRect(X(-cw), Y(YMAX), X(cw)-X(-cw), oy - Y(YMAX));
+  g.strokeStyle = "rgba(76,194,255,0.55)"; g.beginPath(); g.moveTo(X(-cw),oy); g.lineTo(X(-cw),Y(YMAX)); g.moveTo(X(cw),oy); g.lineTo(X(cw),Y(YMAX)); g.stroke();
+  // stop distance + d_safe
+  const line = (y, col, label, dash) => { if (!(y>0) || y>YMAX) return; g.setLineDash(dash||[]); g.strokeStyle=col; g.lineWidth=2;
+      g.beginPath(); g.moveTo(X(-cw*3), Y(y)); g.lineTo(X(cw*3), Y(y)); g.stroke(); g.setLineDash([]); g.fillStyle=col; g.fillText(label, X(cw*3)+4, Y(y)+4); };
+  line(a.config.proximity_stop_m, "#ef4444", "stop " + fmt(a.config.proximity_stop_m,2) + " m");
+  if (a.threat.valid && a.d_safe[0] > 0.02) line(a.d_safe[0], "#f97316", "d_safe P " + fmt(a.d_safe[0],2), [5,4]);
+  // car
+  g.fillStyle = "#cbd5e1"; g.fillRect(ox-14, oy+2, 28, 12); g.fillStyle="#0b0f14"; g.fillRect(ox-3, oy+2, 6, 4);
+  // tracks
+  for (const t of a.radar.tracks){
+    const px = X(t.x), py = Y(t.y);
+    if (t.y > YMAX + 0.5) continue;
+    const col = t.threat ? "#ef4444" : t.path ? "#fbbf24" : "#64748b";
+    // closing-speed vector
+    if (Math.abs(t.vc) > 0.05){
+      const len = Math.min(1.5, Math.abs(t.vc)) * sc * 0.6 * (t.vc > 0 ? 1 : -1);
+      const ux = t.r > 0 ? -t.x/t.r : 0, uy = t.r > 0 ? -t.y/t.r : 1;
+      g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(px + ux*len, py - uy*len); g.stroke();
+    }
+    g.beginPath(); g.arc(px, py, t.threat ? 9 : 7, 0, 2*Math.PI); g.fillStyle = col; g.globalAlpha = t.conf ? 1 : 0.45; g.fill(); g.globalAlpha = 1;
+    g.fillStyle = "#e6edf3"; g.font = "12px ui-monospace,monospace";
+    g.fillText(`id${t.id} ${fmt(t.r,2)}m ${t.vc>=0?"+":""}${fmt(t.vc,2)}`, px + 12, py - 6);
+  }
+  if (!a.radar.tracks.length){ g.fillStyle="#5b6b80"; g.font="13px system-ui,sans-serif"; g.fillText("no radar targets", ox-50, Y(YMAX/2)); }
+}
+
+function drawTimeline(){
+  const [g, w, h] = fitCanvas($("timeline"));
+  g.clearRect(0,0,w,h);
+  const L = 44, R = 44, T = 8, B = 30, pw = w-L-R, ph = h-T-B;
+  const now = hist.length ? hist[hist.length-1].t : 0;
+  const X = t => L + pw * (1 - (now - t)/HIST_S);
+  const RMAX = 6, TMAX = 5;
+  const Yr = r => T + ph * (1 - Math.min(r,RMAX)/RMAX), Yt = s => T + ph * (1 - Math.min(s,TMAX)/TMAX);
+  g.strokeStyle = "#1e2835"; g.lineWidth = 1; g.fillStyle = "#5b6b80"; g.font = "11px ui-monospace,monospace";
+  for (let r=0; r<=RMAX; r+=1){ g.beginPath(); g.moveTo(L, Yr(r)); g.lineTo(L+pw, Yr(r)); g.stroke(); g.fillText(r+"m", 6, Yr(r)+4); }
+  for (let s=0; s<=TMAX; s+=1){ g.fillText(s+"s", L+pw+6, Yt(s)+4); }
+  for (let k=0; k<=HIST_S; k+=5){ const x = L + pw*(1-k/HIST_S); g.fillText(k?("-"+k+"s"):"now", x-10, h-6); }
+  // state band
+  for (let i=0; i<hist.length-1; i++){
+    g.fillStyle = STATE_COLORS[hist[i].state] || "#334155";
+    g.fillRect(X(hist[i].t), T+ph+4, Math.max(1, X(hist[i+1].t)-X(hist[i].t)), 8);
+  }
+  const series = (key, Yf, col) => {
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); let pen = false;
+    for (const p of hist){ const v = p[key]; if (v===null){ pen=false; continue; }
+      const x = X(p.t), y = Yf(v); if (!pen){ g.moveTo(x,y); pen=true; } else g.lineTo(x,y); }
+    g.stroke();
+  };
+  series("range", Yr, "#4cc2ff");
+  series("ttc", Yt, "#f59e0b");
+}
+
+/* ---------------- controls ---------------- */
+async function cmd(c){
+  try{
+    const r = await fetch("/api/cmd?c=" + c, {cache:"no-store"});
+    const j = await r.json();
+    $("ctlMsg").textContent = (j.ok ? "sent: " : "failed: ") + c.toUpperCase() + " · " + new Date().toLocaleTimeString();
+  }catch(e){ $("ctlMsg").textContent = "failed: no link to the Pi"; }
+}
+$("bGo").onclick = () => { if (confirm("Start driving? Make sure the path is clear.")) cmd("go"); };
+$("bStop").onclick = () => cmd("stop");
+$("bEstop").onclick = () => cmd("estop");
+$("bClear").onclick = () => cmd("clear");
+document.addEventListener("keydown", e => { if (e.code === "Space"){ e.preventDefault(); cmd("estop"); } });
+window.addEventListener("resize", () => { if (latest && latest.aeb) drawRadar(latest.aeb); drawTimeline(); });
+setInterval(() => { if (Date.now() - lastOk > 2000) setConn(); }, 500);
+poll();
+</script>
+</body>
+</html>

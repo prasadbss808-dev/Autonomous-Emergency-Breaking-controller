@@ -1,0 +1,3 @@
+t_ms,kind,state,risk,target_valid,target_id,range_m,x_m,v_close_mps,ttc_s,d_safe_partial_m,d_safe_strong_m,d_safe_full_m,ego_mps,ego_valid,a_long_mps2,motor_cmd,duty_pct,cmd_latency_us,radar_ok,imu_ok,motor_ok,system_ok,faults_hex,event
+9.157,EVENT,,,,,,,,,,,,,,,,,,,,,,,"INFO SIM TEST 1: No obstacle  (expected: NORMAL driving throughout)"
+9.333,EVENT,,,,,,,,,,,,,,,,,,,,,,,"INFO camera (aeb_vision) not connected - radar-only AEB"

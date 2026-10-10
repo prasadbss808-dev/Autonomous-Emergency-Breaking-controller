@@ -1,0 +1,35 @@
+# AEB parameter overrides:  aeb -c aeb.conf
+# Every key is optional; defaults are in src/config.h. Print all: aeb -P
+#
+# ---- motor pins (BCM numbers) ----
+# pin_front_rpwm  = 12
+# pin_front_lpwm  = 22
+# pin_front_en    = 23
+# pin_rear_rpwm = 13
+# pin_rear_lpwm = 27
+# pin_rear_en   = 24
+#
+# ---- IMU mounting (check with: aeb -m imu, push car forward -> a_fwd positive) ----
+# imu_forward_axis = 0        # 0=X 1=Y 2=Z of the MPU6050 chip
+# imu_forward_sign = 1
+#
+# ---- AEB thresholds (prototype values - calibrate!) ----
+# ttc_warning_s  = 2.5
+# ttc_partial_s  = 1.6
+# ttc_strong_s   = 1.0
+# ttc_critical_s = 0.6
+# safety_factor  = 1.3
+# t_delay_s      = 0.08       # set from measured radar frame period + latency
+# corridor_half_width_m = 0.20
+# proximity_stop_m = 0.30
+#
+# ---- motor duties ----
+# cruise_duty  = 60
+# partial_duty = 30
+# strong_duty  = 10
+# motor_max_duty = 100        # 50 if the motors are 6 V types on a 12 V battery
+#
+# ---- measured braking decelerations (written by: aeb -m calib -y) ----
+# decel_measured_partial = 0.0
+# decel_measured_strong  = 0.0
+# decel_measured_full    = 0.0
